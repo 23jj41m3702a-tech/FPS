@@ -23,7 +23,7 @@ function room(name) {
   return rooms[name] || (rooms[name] = { name, players: new Map(), a: 0, b: 0, phase: 'play', endAt: Date.now() + ROUND_MS });
 }
 const send = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
-const bcast = (r, o, except) => r.players.forEach(p => { if (p !== except) send(p.ws, o); });
+const bcast = (r, o, except) => r.players.forEach(p => { if (p.ws !== except) send(p.ws, o); });
 const tl = r => Math.max(0, Math.ceil((r.endAt - Date.now()) / 1000));
 function boardMsg(r) {
   return { t: 'b', a: r.a, b: r.b, tl: tl(r), ph: r.phase,
@@ -110,6 +110,9 @@ wss.on('connection', ws => {
         const dmg = BLAST.max * Math.pow(1 - dist / BLAST.radius, BLAST.pow);
         if (dmg > 1) damage(r, v, me, Math.round(dmg), 'f', false);
       });
+    } else if (m.t === 'smoke') {
+      if (r.phase !== 'play' || !Array.isArray(m.p) || m.p.length !== 3) return;
+      bcast(r, { t: 'smoke', p: m.p.map(Number) }, ws);
     } else if (m.t === 'fall') {
       if (!me.alive) return;
       const dmg = Math.min(HP_MAX, (-m.vy - FALL.safe) * FALL.k);
@@ -129,7 +132,7 @@ wss.on('connection', ws => {
 setInterval(() => {
   for (const r of Object.values(rooms)) {
     const ups = []; r.players.forEach(p => { if (p.upd) { ups.push(p.upd); p.upd = null; } });
-    if (ups.length) bcast(r, { t: 's', p: ups });
+    if (ups.length) r.players.forEach(p => { const o = ups.filter(u => u[0] !== p.id); if (o.length) send(p.ws, { t: 's', p: o }); });
   }
 }, 50);
 setInterval(() => {
