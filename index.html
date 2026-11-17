@@ -3603,7 +3603,12 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
     if (slot !== 1 && slot !== 2) return;
     var best = null;
     for (var id in players) { var rp = players[id]; if (!rp.alive || !rp.pos || !rp.mesh || rp.team === me.team) continue; var h = hitTest(ov, dv, rp.pos); if (h && (!best || h.t < best.t)) best = { id: +id, t: h.t, z: h.z }; }
-    if (best && best.t < 170 && !occluded(ov, dv, best.t)) send({ t: 'hit', id: best.id, z: best.z, sl: slot });
+    if (best && best.t < 170) {
+      var now = performance.now(), oc = MP.oc, blocked;
+      if (oc && oc.id === best.id && now - oc.t < 90) blocked = oc.v;   // 연사 중 매 발마다 씬 전체 레이캐스트하면 렉이 걸려 90ms 캐시
+      else { blocked = occluded(ov, dv, best.t); MP.oc = { id: best.id, t: now, v: blocked }; }
+      if (!blocked) send({ t: 'hit', id: best.id, z: best.z, sl: slot });
+    }
   };
   MP.onBoom = function (pos) {   // 내가 던진 수류탄이 터짐(차량 폭발 제외)
     var P = BZ.getP(); if (!P || window.MPDEAD || !me.alive) return;
@@ -3669,26 +3674,10 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
   }
 
   /* ───────── 렌더 훅: 원격 플레이어 갱신 + 사망 시점 ───────── */
-  /* 내 몸·카메라 바로 곁에 끼어든 작은 물체(1인칭 시야를 가리는 판 등)는 자동으로 숨김 */
-  var nearHid = [], nearN = 0;
-  function hideNear() {
-    if (++nearN % 6) return;
-    var cp = camera.position, R2 = 1.3 * 1.3, i, o;
-    for (i = nearHid.length - 1; i >= 0; i--) { o = nearHid[i]; var e = o.matrixWorld.elements, dx = e[12] - cp.x, dy = e[13] - cp.y, dz = e[14] - cp.z; if (dx * dx + dy * dy + dz * dz > R2 * 1.4) { o.visible = true; nearHid.splice(i, 1); } }
-    scene.traverse(function (m) {
-      if (!m.isMesh || m.isInstancedMesh || !m.visible || m.userData.mp || (m.parent && m.parent.userData && m.parent.userData.mp)) return;
-      var e = m.matrixWorld.elements, dx = e[12] - cp.x, dy = e[13] - cp.y, dz = e[14] - cp.z;
-      if (dx * dx + dy * dy + dz * dz > R2) return;
-      var g = m.geometry; if (!g) return; if (!g.boundingSphere) g.computeBoundingSphere();
-      var sc = Math.max(m.scale.x, m.scale.y, m.scale.z); if (g.boundingSphere.radius * sc > 1.6) return;   // 벽·바닥 같은 큰 것은 제외
-      m.visible = false; nearHid.push(m);
-    });
-  }
   var origRender = renderer.render;
   renderer.render = function (s, c) {
     if (s === scene) {
       try { updateRemotes(); } catch (e) { console.error(e); }
-      try { hideNear(); } catch (e) { console.error(e); }
       if (window.MPDEAD) { var tt = Math.min(1, (performance.now() - deadAt) / 700), e3 = tt * tt * (3 - 2 * tt); camera.position.y -= (EYE - .3) * e3; camera.rotation.z += 1.2 * e3 * deadSide; }
     } else if (window.MPDEAD) return;   // 사망 중엔 1인칭 총/손을 그리지 않음
     return origRender.apply(this, arguments);
@@ -3734,7 +3723,7 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
         online = true; me.id = m.id; me.team = m.team; me.name = m.name; phase = m.phase; killLimit = m.killLimit || 30; board.a = m.a; board.b = m.b; board.tl = m.tl; board.p = [];
         players = {}; m.players.forEach(function (p) { newPlayer(p.id, p.name, p.team, p.alive); });
         setHp(m.hp); renderTop(); fin(true); break;
-      case 'pj': newPlayer(m.id, m.name, m.team, true); toast(m.name + ' 님이 입장했습니다'); break;
+      case 'pj': if (m.id === me.id) break; newPlayer(m.id, m.name, m.team, true); toast(m.name + ' 님이 입장했습니다'); break;
       case 'pl': rp = players[m.id]; if (rp) toast(rp.name + ' 님이 나갔습니다'); removePlayer(m.id); break;
       case 's':
         var n = performance.now();
