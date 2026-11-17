@@ -2427,7 +2427,7 @@ function fpCam(){const n=performance.now(),dt=Math.min(.05,(n-lastF)/1000);lastF
  cam.fov=FP.f*(innerWidth/innerHeight<1?1.35:1)*(1-(opt[0].visible?.13:.06)*k);
  const mf=75-(opt[0].visible?14:8)*k+CAMFX.fov;if(Math.abs(BZ.camera.fov-mf)>.01){BZ.camera.fov=mf;BZ.camera.updateProjectionMatrix()}}
 const WW=new T.Vector3();
-function armVis(){[LH,RH].forEach(H=>{const A=H.A,u=A.slm.userData;A.jw.getWorldPosition(WW);u.uW.value.copy(WW);u.uF.value.set(1e5,2e5);A.ua.visible=A.jsh.visible=A.je.visible=true;A.pad.visible=!fp});{const g2=slot===3,A=RH.A;RH.O.visible=!g2;A.fa.visible=A.cuff.visible=A.jw.visible=A.ua.visible=A.jsh.visible=A.je.visible=!g2;if(g2)A.pad.visible=false}}   // 1인칭: 팔뚝만 보이고 손목에서 멀어질수록 사라짐 (거대한 파이프처럼 보이지 않게)
+function armVis(){[LH,RH].forEach(H=>{const A=H.A,u=A.slm.userData;A.jw.getWorldPosition(WW);u.uW.value.copy(WW);u.uF.value.set(55,150);   /* 소매 페이드: 손목에서 55~150 거리에서 서서히 투명 (값을 키우면 팔이 더 길게 보임) */A.ua.visible=A.jsh.visible=A.je.visible=true;A.pad.visible=!fp});{const g2=slot===3,A=RH.A;RH.O.visible=!g2;A.fa.visible=A.cuff.visible=A.jw.visible=A.ua.visible=A.jsh.visible=A.je.visible=!g2;if(g2)A.pad.visible=false}}   // 1인칭: 팔뚝만 보이고 손목에서 멀어질수록 사라짐 (거대한 파이프처럼 보이지 않게)
 // ── 전술 질주(Tactical Sprint): 이동·달리기 중에는 총구를 약 75° 위로 세워 화면 오른쪽 아래로 바짝 당기고, 오른손만 손잡이를 쥐며 왼손은 핸드가드에서 떼어 팔을 흔듦 ──
 // 멈추거나 조준·사격·장전·살펴보기를 하면 정면으로 복귀. 사격 직후 약 0.4초는 올린 채 유지. 올릴 땐 빠르고 살짝 튕기며, 내릴 땐 부드럽게
 const LR={w:0,v:0,s:0,wr:0,ws:0,lh:false,sa:false,q:new T.Quaternion(),o:{px:0,py:0,pz:0,rx:0,ry:0,rz:0}};
