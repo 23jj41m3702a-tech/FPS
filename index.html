@@ -206,7 +206,7 @@ body.touch #am { right: auto; left: max(16px, env(safe-area-inset-left, 0px)); t
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
 
 <script>
 /* ---------- 맵 데이터와 이동 물리 (DOM 없이 동작) ---------- */
@@ -3297,7 +3297,7 @@ function popSmoke(b){if(!b.remote&&window.MP&&MP.onSmoke)MP.onSmoke(b.m.position
  const e={b,t:0,acc:0,ja:0,c:b.m.position,up:V3(0,1,0),hiss:null,sp:null};smkScan(e);SMK.push(e);hissStart(e);   // c: 연막탄의 '현재' 위치를 계속 따라감(굴러가면 연막 중심도 같이 이동)
  if(SND.gboom){const d=camDist(e.c);play('gboom',.05*Math.min(1,1.7/(1+d*.07)),1.8,0,e.c.y<-.5)}
  for(let i=0;i<10;i++)smkPuff(e,'jet')}
-window.MPAPI.smoke=function(p){popSmoke({m:{position:p.clone()},remote:true})};   // 멀티플레이: 다른 사람이 던진 연막을 내 화면에도 터뜨림
+window.MPAPI.smoke=function(p){const m=new T.Object3D();m.position.copy(p);m.scale.setScalar(.042*TS/1.15);popSmoke({m,remote:true})};   // 실제 연막탄과 같은 크기의 빈 객체(분사구 위치 계산용)   // 멀티플레이: 다른 사람이 던진 연막을 내 화면에도 터뜨림
 function smkAdd(pos,o){const m=new T.SpriteMaterial({map:smkTex2,transparent:true,depthWrite:false,opacity:0,color:o.col}),s=new T.Sprite(m);s.position.copy(pos);s.scale.set(o.s0,o.s0,1);m.rotation=rnd()*6.28;s.renderOrder=999;BZ.scene.add(s);
  FX.push(Object.assign({k:'m',s,m,t:0,ph:rnd()*6.28,rs:(rnd()-.5)*.25},o));}
 function smkPuff(e,mode){const vent=ventPos(e),g=(.86+rnd()*.12)*255|0,col=(g<<16)|(g<<8)|(g-(rnd()*8|0));
@@ -3367,7 +3367,7 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
   var WNAME = { r: 'HX7', p: '글록 21', f: '수류탄', x: '낙하' };
   var BLAST = { radius: 8, max: 150, pow: 1.2 }, FALL = { safe: 12, k: 5 };   // 서버와 동일(오프라인 단독 플레이용)
   var $ = function (id) { return document.getElementById(id); };
-  window.addEventListener('error', function (e) { try { toast('[오류] ' + e.message, 8000); } catch (x) {} });
+  window.addEventListener('error', function (e) { try { var st = (e.error && e.error.stack || '').split('\n').slice(1, 4).map(function (l) { return l.trim().replace(/^at /, '').replace(/https?:\/\/[^ )]*\//, ''); }).join(' | '); toast('[오류] ' + e.message + (e.lineno ? ' (줄 ' + e.lineno + ')' : '') + (st ? ' ← ' + st : ''), 15000); console.error(e.error || e.message); } catch (x) {} });
   var lastKillAt = 0, lastRaf = performance.now();
   var online = false, ws = null, phase = 'play', killLimit = 30;
   var me = { id: -1, team: 'A', name: '', hp: HP_MAX, alive: true, prot: 0 };
@@ -3595,7 +3595,7 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
   }
   function blocks(h) { var ob = h.object; return ob.isMesh && !ob.userData.bh && !ob.userData.glass && !ob.userData.hole && !(ob.material && ob.material.transparent); }
   function occluded(o, d, dist) {
-    _o.set(o.x, o.y, o.z); _d.set(d.x, d.y, d.z).normalize(); rc2.set(_o, _d); rc2.near = 0; rc2.far = Math.max(.1, dist - .05);
+    _o.set(o.x, o.y, o.z); _d.set(d.x, d.y, d.z).normalize(); rc2.set(_o, _d); rc2.camera = camera; rc2.near = 0;   // 스프라이트(연기·화염) 레이캐스트에는 카메라가 필요함 rc2.far = Math.max(.1, dist - .05);
     var hs = rc2.intersectObjects(scene.children, true); for (var i = 0; i < hs.length; i++) if (blocks(hs[i])) return true; return false;
   }
   function r3(v) { return Math.round(v * 1000) / 1000; }
@@ -3615,7 +3615,8 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
     }
   }
   MP.onSmoke = function (pos) { if (!online) return; send({ t: 'smoke', p: [r3(pos.x), r3(pos.y), r3(pos.z)] }); };
-  MP.onBoom = function (pos) {   // 내가 던진 수류탄이 터짐(차량 폭발 제외)
+  MP.onBoom = function (pos) { try { onBoomInner(pos); } catch (err) { console.error(err); toast('[오류] 폭발 처리: ' + (err && err.message), 10000); } };
+  function onBoomInner(pos) {   // 내가 던진 수류탄이 터짐(차량 폭발 제외)
     var P = BZ.getP(); if (!P || window.MPDEAD || !me.alive) return;
     var c = { x: pos.x, y: pos.y + .3, z: pos.z };
     function los(x, y, z) { var d = { x: x - c.x, y: y - c.y, z: z - c.z }, L = Math.hypot(d.x, d.y, d.z); if (L < .6) return true; d.x /= L; d.y /= L; d.z /= L; return !occluded(c, d, L); }
@@ -3626,7 +3627,7 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
     if (selfHit) v.push(me.id);
     for (var id in players) { var rp = players[id]; if (rp.alive && rp.pos && rp.team !== me.team && dmgAt(rp.pos.x, rp.pos.y + 1, rp.pos.z) > 1 && los(rp.pos.x, rp.pos.y + 1, rp.pos.z)) v.push(+id); }
     send({ t: 'boom', p: [r3(pos.x), r3(pos.y), r3(pos.z)], v: v });
-  };
+  }
 
   /* ───────── 사망 / 리스폰 ───────── */
   function resupply() { var rs = (window.MPAPI && MPAPI.rs) || []; rs.forEach(function (f) { try { f(); } catch (e) {} }); }
