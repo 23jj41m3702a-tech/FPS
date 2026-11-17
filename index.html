@@ -3596,7 +3596,8 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
   function blocks(h) { var ob = h.object; return ob.isMesh && !ob.userData.bh && !ob.userData.glass && !ob.userData.hole && !(ob.material && ob.material.transparent); }
   function occluded(o, d, dist) {
     _o.set(o.x, o.y, o.z); _d.set(d.x, d.y, d.z).normalize(); rc2.set(_o, _d); rc2.camera = camera; rc2.near = 0;   // 스프라이트(연기·화염) 레이캐스트에는 카메라가 필요함 rc2.far = Math.max(.1, dist - .05);
-    var hs = rc2.intersectObjects(scene.children, true); for (var i = 0; i < hs.length; i++) if (blocks(hs[i])) return true; return false;
+    var hs; try { hs = rc2.intersectObjects(scene.children, true); } catch (err) { console.error(err); return false; }   // 검사 실패 시 '가림 없음'으로 처리해 명중 신고가 막히지 않게 함
+    for (var i = 0; i < hs.length; i++) if (blocks(hs[i])) return true; return false;
   }
   function r3(v) { return Math.round(v * 1000) / 1000; }
   MP.onShot = function (o, d, slot) { try { onShotInner(o, d, slot); } catch (err) { console.error(err); toast('[오류] 사격 처리: ' + (err && err.message), 8000); } };
