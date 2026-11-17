@@ -3293,10 +3293,11 @@ function smkScan(e){const c=e.b.m.position,fl=floorAt(c.x,c.y+.15,c.z),NB=24,fre
  for(let k=0;k<NB;k++){const an=k/NB*6.283,dx=Math.cos(an),dz=Math.sin(an);let d=SMK_T.RMAX+2;for(let s=1;s<=20;s++){const r=s*.5;if(solidAt(c.x+dx*r,fl+2,c.z+dz*r)){d=r;break}}free.push(d)}   // 방향별로 벽까지 거리 → 벽 너머로는 안 퍼지고, 문·개구부 쪽으로는 새어나감
  let ceil=fl+7;const bs=BZ.M.boxes;for(let i=0;i<bs.length;i++){const q=bs[i];if(c.x>q.x0&&c.x<q.x1&&c.z>q.z0&&c.z<q.z1&&q.y0>fl+1.6&&q.y0<ceil)ceil=q.y0}   // 천장(실내면 낮아져 좁은 공간을 가득 채움)
  e.fl=fl;e.free=free;e.ceil=ceil;e.sp=c.clone()}
-function popSmoke(b){b.gren=false;b.t=0;b.life=40;
+function popSmoke(b){if(!b.remote&&window.MP&&MP.onSmoke)MP.onSmoke(b.m.position);b.gren=false;b.t=0;b.life=40;
  const e={b,t:0,acc:0,ja:0,c:b.m.position,up:V3(0,1,0),hiss:null,sp:null};smkScan(e);SMK.push(e);hissStart(e);   // c: 연막탄의 '현재' 위치를 계속 따라감(굴러가면 연막 중심도 같이 이동)
  if(SND.gboom){const d=camDist(e.c);play('gboom',.05*Math.min(1,1.7/(1+d*.07)),1.8,0,e.c.y<-.5)}
  for(let i=0;i<10;i++)smkPuff(e,'jet')}
+window.MPAPI.smoke=function(p){popSmoke({m:{position:p.clone()},remote:true})};   // 멀티플레이: 다른 사람이 던진 연막을 내 화면에도 터뜨림
 function smkAdd(pos,o){const m=new T.SpriteMaterial({map:smkTex2,transparent:true,depthWrite:false,opacity:0,color:o.col}),s=new T.Sprite(m);s.position.copy(pos);s.scale.set(o.s0,o.s0,1);m.rotation=rnd()*6.28;s.renderOrder=999;BZ.scene.add(s);
  FX.push(Object.assign({k:'m',s,m,t:0,ph:rnd()*6.28,rs:(rnd()-.5)*.25},o));}
 function smkPuff(e,mode){const vent=ventPos(e),g=(.86+rnd()*.12)*255|0,col=(g<<16)|(g<<8)|(g-(rnd()*8|0));
@@ -3366,6 +3367,7 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
   var WNAME = { r: 'HX7', p: '글록 21', f: '수류탄', x: '낙하' };
   var BLAST = { radius: 8, max: 150, pow: 1.2 }, FALL = { safe: 12, k: 5 };   // 서버와 동일(오프라인 단독 플레이용)
   var $ = function (id) { return document.getElementById(id); };
+  window.addEventListener('error', function (e) { try { toast('[오류] ' + e.message, 8000); } catch (x) {} });
   var lastKillAt = 0, lastRaf = performance.now();
   var online = false, ws = null, phase = 'play', killLimit = 30;
   var me = { id: -1, team: 'A', name: '', hp: HP_MAX, alive: true, prot: 0 };
@@ -3597,7 +3599,8 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
     var hs = rc2.intersectObjects(scene.children, true); for (var i = 0; i < hs.length; i++) if (blocks(hs[i])) return true; return false;
   }
   function r3(v) { return Math.round(v * 1000) / 1000; }
-  MP.onShot = function (o, d, slot) {
+  MP.onShot = function (o, d, slot) { try { onShotInner(o, d, slot); } catch (err) { console.error(err); toast('[오류] 사격 처리: ' + (err && err.message), 8000); } };
+  function onShotInner(o, d, slot) {
     if (!online || !me.alive || window.MPDEAD || phase !== 'play') return;
     var ov = { x: o.x, y: o.y, z: o.z }, dv = { x: d.x, y: d.y, z: d.z };
     send({ t: 'shot', sl: slot, o: [r3(ov.x), r3(ov.y), r3(ov.z)], d: [r3(dv.x), r3(dv.y), r3(dv.z)] });
@@ -3610,7 +3613,8 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
       else { blocked = occluded(ov, dv, best.t); MP.oc = { id: best.id, t: now, v: blocked }; }
       if (!blocked) send({ t: 'hit', id: best.id, z: best.z, sl: slot });
     }
-  };
+  }
+  MP.onSmoke = function (pos) { if (!online) return; send({ t: 'smoke', p: [r3(pos.x), r3(pos.y), r3(pos.z)] }); };
   MP.onBoom = function (pos) {   // 내가 던진 수류탄이 터짐(차량 폭발 제외)
     var P = BZ.getP(); if (!P || window.MPDEAD || !me.alive) return;
     var c = { x: pos.x, y: pos.y + .3, z: pos.z };
@@ -3707,7 +3711,7 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
     try { ws = new WebSocket(wsUrl(addr)); } catch (e) { return fin(false, '서버 주소가 올바르지 않습니다.'); }
     tm = setTimeout(function () { try { ws.close(); } catch (e) {} fin(false, '서버 응답이 없습니다. 주소·포트·방화벽을 확인하세요.'); }, 7000);
     ws.onopen = function () { send({ t: 'join', name: name, room: room }); };
-    ws.onmessage = function (ev) { var m, t0 = performance.now(); try { m = JSON.parse(ev.data); } catch (e) { return; } onMsg(m, fin); var d = performance.now() - t0; if (d > 25) toast('[진단] 느린 처리: ' + m.t + ' ' + d.toFixed(0) + 'ms', 6000); };
+    ws.onmessage = function (ev) { var m, t0 = performance.now(); try { m = JSON.parse(ev.data); } catch (e) { return; } try { onMsg(m, fin); } catch (err) { console.error(err); toast('[오류] ' + m.t + ': ' + (err && err.message), 8000); } var d = performance.now() - t0; if (d > 25) toast('[진단] 느린 처리: ' + m.t + ' ' + d.toFixed(0) + 'ms', 6000); };
     ws.onerror = function () { fin(false, '서버에 연결할 수 없습니다. 주소를 확인하세요.'); };
     ws.onclose = function () { if (!done) fin(false, '서버가 연결을 닫았습니다.'); else onDisconnect(); };
   }
@@ -3736,6 +3740,7 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
         if (window.MPAPI && MPAPI.playAt && dist < 140) MPAPI.playAt(m.sl === 2 ? 'sh1' : (Math.random() < .5 ? 'sh1' : 'sh2'), o, m.sl === 2 ? .8 : 1, m.sl === 2 ? 1.18 : .96 + Math.random() * .08);
         if (window.MPAPI && MPAPI.bullet && dist < 90) { var t0 = performance.now(); if (t0 - (onMsg.lb || 0) > 45) { onMsg.lb = t0; try { MPAPI.bullet(o, d); } catch (e) {} } }   // 탄흔·유리·파괴물 반영(과부하 방지로 초당 약 20발까지)
         break;
+      case 'smoke': try { if (window.MPAPI && MPAPI.smoke) MPAPI.smoke(new T.Vector3(m.p[0], m.p[1], m.p[2])); } catch (e) { console.error(e); } break;
       case 'boom': MP.rb = true; try { if (window.MPAPI && MPAPI.boom) MPAPI.boom(new T.Vector3(m.p[0], m.p[1], m.p[2])); } catch (e) {} MP.rb = false; break;
       case 'hp': setHp(m.hp); hurtFx(m.dmg, m.from); break;
       case 'hc': hitMarker(m.k ? 'k' : m.z === 'h' ? 'h' : ''); break;
