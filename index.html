@@ -1804,9 +1804,9 @@ window.FS_B64={"concrete":["SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAA
   window.addEventListener('resize', resize);
 
   /* 진단 표시(F3로 켜기/끄기): 프레임 시간·드로콜·파편/이펙트 개수 */
-  var DBGS = { f: 0, t0: performance.now(), mx: 0, mx2: 0, mxT: 0, rms: 0, gms: 0, rc: 0, tr: 0, show: true };
+  var DBGS = { f: 0, t0: performance.now(), mx: 0, mx2: 0, mxT: 0, rms: 0, gms: 0, rc: 0, tr: 0, show: false };
   var dbgEl = document.createElement('div');
-  dbgEl.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99;font:11px/1.35 monospace;color:#9f9;background:rgba(0,0,0,.6);padding:4px 6px;white-space:pre;pointer-events:none';
+  dbgEl.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99;font:11px/1.35 monospace;color:#9f9;background:rgba(0,0,0,.6);padding:4px 6px;white-space:pre;pointer-events:none;display:none';
   document.body.appendChild(dbgEl);
   window.addEventListener('keydown', function (e) { if (e.code === 'F3') { e.preventDefault(); DBGS.show = !DBGS.show; dbgEl.style.display = DBGS.show ? 'block' : 'none'; } });
   function dbgTick(now, raw, rms, gms) {
