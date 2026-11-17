@@ -3669,10 +3669,26 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
   }
 
   /* ───────── 렌더 훅: 원격 플레이어 갱신 + 사망 시점 ───────── */
+  /* 내 몸·카메라 바로 곁에 끼어든 작은 물체(1인칭 시야를 가리는 판 등)는 자동으로 숨김 */
+  var nearHid = [], nearN = 0;
+  function hideNear() {
+    if (++nearN % 6) return;
+    var cp = camera.position, R2 = 1.3 * 1.3, i, o;
+    for (i = nearHid.length - 1; i >= 0; i--) { o = nearHid[i]; var e = o.matrixWorld.elements, dx = e[12] - cp.x, dy = e[13] - cp.y, dz = e[14] - cp.z; if (dx * dx + dy * dy + dz * dz > R2 * 1.4) { o.visible = true; nearHid.splice(i, 1); } }
+    scene.traverse(function (m) {
+      if (!m.isMesh || m.isInstancedMesh || !m.visible || m.userData.mp || (m.parent && m.parent.userData && m.parent.userData.mp)) return;
+      var e = m.matrixWorld.elements, dx = e[12] - cp.x, dy = e[13] - cp.y, dz = e[14] - cp.z;
+      if (dx * dx + dy * dy + dz * dz > R2) return;
+      var g = m.geometry; if (!g) return; if (!g.boundingSphere) g.computeBoundingSphere();
+      var sc = Math.max(m.scale.x, m.scale.y, m.scale.z); if (g.boundingSphere.radius * sc > 1.6) return;   // 벽·바닥 같은 큰 것은 제외
+      m.visible = false; nearHid.push(m);
+    });
+  }
   var origRender = renderer.render;
   renderer.render = function (s, c) {
     if (s === scene) {
       try { updateRemotes(); } catch (e) { console.error(e); }
+      try { hideNear(); } catch (e) { console.error(e); }
       if (window.MPDEAD) { var tt = Math.min(1, (performance.now() - deadAt) / 700), e3 = tt * tt * (3 - 2 * tt); camera.position.y -= (EYE - .3) * e3; camera.rotation.z += 1.2 * e3 * deadSide; }
     } else if (window.MPDEAD) return;   // 사망 중엔 1인칭 총/손을 그리지 않음
     return origRender.apply(this, arguments);
