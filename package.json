@@ -1,16 +1,9 @@
 {
-  "name": "bazaar-row",
+  "name": "fps-server",
   "version": "1.0.0",
   "private": true,
-  "description": "바자르 로우 - 3D 팀 데스매치 (정적 파일 + WebSocket 서버)",
   "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "dependencies": {
-    "ws": "^8.18.0"
-  }
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "^8.18.0" }
 }
