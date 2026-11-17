@@ -3366,6 +3366,7 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
   var WNAME = { r: 'HX7', p: '글록 21', f: '수류탄', x: '낙하' };
   var BLAST = { radius: 8, max: 150, pow: 1.2 }, FALL = { safe: 12, k: 5 };   // 서버와 동일(오프라인 단독 플레이용)
   var $ = function (id) { return document.getElementById(id); };
+  var lastKillAt = 0, lastRaf = performance.now();
   var online = false, ws = null, phase = 'play', killLimit = 30;
   var me = { id: -1, team: 'A', name: '', hp: HP_MAX, alive: true, prot: 0 };
   var players = {}, board = { a: 0, b: 0, tl: 0, p: [] };
@@ -3706,7 +3707,7 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
     try { ws = new WebSocket(wsUrl(addr)); } catch (e) { return fin(false, '서버 주소가 올바르지 않습니다.'); }
     tm = setTimeout(function () { try { ws.close(); } catch (e) {} fin(false, '서버 응답이 없습니다. 주소·포트·방화벽을 확인하세요.'); }, 7000);
     ws.onopen = function () { send({ t: 'join', name: name, room: room }); };
-    ws.onmessage = function (ev) { var m; try { m = JSON.parse(ev.data); } catch (e) { return; } onMsg(m, fin); };
+    ws.onmessage = function (ev) { var m, t0 = performance.now(); try { m = JSON.parse(ev.data); } catch (e) { return; } onMsg(m, fin); var d = performance.now() - t0; if (d > 25) toast('[진단] 느린 처리: ' + m.t + ' ' + d.toFixed(0) + 'ms', 6000); };
     ws.onerror = function () { fin(false, '서버에 연결할 수 없습니다. 주소를 확인하세요.'); };
     ws.onclose = function () { if (!done) fin(false, '서버가 연결을 닫았습니다.'); else onDisconnect(); };
   }
@@ -3740,6 +3741,7 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
       case 'hc': hitMarker(m.k ? 'k' : m.z === 'h' ? 'h' : ''); break;
       case 'dead': { var by = m.by >= 0 ? nm(m.by).n : null; die(by ? '처치: ' + by + ' · ' + (WNAME[m.s] || '') + (m.h ? ' · 헤드샷' : '') : (m.s === 'x' ? '낙하 사고' : '자폭'), m.rs || 3000); break; }
       case 'kill': {
+        lastKillAt = performance.now();
         var k = m.k >= 0 ? nm(m.k) : null, v = nm(m.v), w = WNAME[m.s] || '';
         feedAdd((k ? '<span class="' + k.t.toLowerCase() + '">' + esc(k.n) + '</span><i>' + w + (m.h ? ' ✦' : '') + '</i>' : '<i>' + w + '</i>') + '<span class="' + v.t.toLowerCase() + '">' + esc(v.n) + '</span>', m.k === me.id || m.v === me.id);
         rp = players[m.v]; if (rp) { rp.alive = false; rp.deadAt = performance.now(); }
@@ -3760,6 +3762,11 @@ window.GUN={render:function(){gPhys();const st=BZ.state;
       case 'ms': phase = 'play'; clearInterval(endTimer); $('mpEnd').style.display = 'none'; toast('새 경기 시작!'); break;
     }
   }
+  (function gapWatch() {   // [진단] 킬 직후 2.5초 안에 프레임이 120ms 이상 멈추면 화면에 표시
+    var n = performance.now(), gap = n - lastRaf; lastRaf = n;
+    if (gap > 120 && n - lastKillAt < 2500) toast('[진단] 킬 직후 멈춤 ' + gap.toFixed(0) + 'ms', 6000);
+    requestAnimationFrame(gapWatch);
+  })();
   setInterval(function () {   // 내 위치·시점을 20Hz로 서버에 전송
     if (!online || !me.alive || !state.playing) return;
     var P = BZ.getP(); if (!P) return; var A = window.MPAPI || {};
